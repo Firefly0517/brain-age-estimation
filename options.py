@@ -25,7 +25,7 @@ parser.add_argument('--modal2', type=str, default='DTI',
 # Training specifications
 parser.add_argument('--epochs', type=int, default=200,
                     help='number of epochs to train')
-parser.add_argument('--batch_size', type=int, default=16,
+parser.add_argument('--batch_size', type=int, default=2,
                     help='input batch size for training')
 parser.add_argument('--test_only', action='store_true',
                     help='set this option to test the model')
@@ -60,7 +60,7 @@ parser.add_argument('--loss', type=str, default='1*L1',
                     help='loss function configuration')
 
 # Log specifications
-parser.add_argument('--save', type=str, default='Dual-ArbNet',
+parser.add_argument('--save', type=str, default='firefly',
                     help='file name to save')
 parser.add_argument('--load', type=str, default='.',
                     help='file name to load')

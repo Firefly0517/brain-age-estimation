@@ -15,7 +15,7 @@ def save_age_as_npy(excel_file_path):
     for index, row in df.iterrows():
         age = row['AGE']
         ixi_id = str(int(row['IXI_ID'])).zfill(3)  # 将 IXI_ID 转换为三位字符串
-        file_name = f'IXI-{ixi_id}.npy'
+        file_name = f'{ixi_id}.npy'
         file_path = os.path.join(output_dir, file_name)
 
         # 将 AGE 数据保存为 .npy 文件

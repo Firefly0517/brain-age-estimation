@@ -1,7 +1,5 @@
 import torch
 from torch.utils.data import Dataset as image_dataset
-from torch_geometric.data import Dataset as graph_dataset
-from torch_geometric.data import Data
 import os
 import numpy as np
 
