@@ -1,37 +1,63 @@
 import torch
-import models
 from options import args
 import utility
-import models
-import Data
+import dataloader
+from torch.utils.data import Subset
 from torch.utils.data import DataLoader
-
 
 if __name__ == '__main__':
     torch.manual_seed(args.seed)
-    modal1_loader = Data.Brain_image(args.modal1, args)
-    modal2_loader = Data.Brain_image(args.modal2, args)
-    print("modal1");
-    for images, labels, names in modal1_loader:
-        # 在这里处理每个批次的数据
-        print(images.shape, labels.shape, names)
-    print("\nmodal2");
-    for images, labels, names in modal2_loader:
-        # 在这里处理每个批次的数据
-        print(images.shape, labels.shape, names)
-    print("\nmodal1_length", len(modal1_loader))
-    print("modal2_length", len(modal2_loader))
+
     checkpoint = utility.checkpoint(args)
     if checkpoint.ok:
+        full_dataset = dataloader.Brain_image(args)
+
+        # print("modal");
+        # for images1, images2, labels, names in full_dataset:
+        #     print(images1.shape, images2.shape,labels.shape, names)
+        #     break
+        # torch.Size([1, 160, 192, 160]) channel=1
+
+        # 划分数据集
+        dataset_size = len(full_dataset)
+        train_ratio = 0.8  # 训练集比例
+        val_ratio = 0.05  # 验证集比例
+        test_ratio = 0.15  # 测试集比例
+
+        train_size = int(train_ratio * dataset_size)
+        val_size = int(val_ratio * dataset_size)
+        test_size = dataset_size - train_size - val_size
+        print("train_size:",train_size, "val_size:",val_size, "test_size",test_size)
+
+        indices = list(range(dataset_size))
+        train_indices = indices[:train_size]
+        val_indices = indices[train_size:train_size + val_size]
+        test_indices = indices[train_size + val_size:]
+
+        # create new dateset
+        train_dataset = Subset(full_dataset, train_indices)
+        val_dataset = Subset(full_dataset, val_indices)
+        test_dataset = Subset(full_dataset, test_indices)
+
+        # create new dataloader
+        train_loader = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True, pin_memory=not args.cpu)
+        val_loader = DataLoader(val_dataset, batch_size=args.batch_size, shuffle=False, pin_memory=not args.cpu)
+        test_loader = DataLoader(test_dataset, batch_size=args.batch_size, shuffle=False, pin_memory=not args.cpu)
+        # 打印训练集数据信息
+        # print("Training data:")
+        # for images1, images2, labels, names in train_loader:
+        #     print(images1.shape, images2.shape, labels.shape, names)
+        #     break
+        # torch.Size([2, 1, 160, 192, 160]) batch=2 channel=1
 
 
-        model = models.ConvNet(args)
-        loss = loss.Loss(args, checkpoint) if not args.test_only else None
-        t = Trainer(args, loader, model, loss, checkpoint)
-        while not t.terminate():
-            t.train()
-            t.test()
-
-        checkpoint.done()
+        # model = models.ConvNet(args)
+        # loss = loss.Loss(args, checkpoint) if not args.test_only else None
+        # t = Trainer(args, loader, model, loss, checkpoint)
+        # while not t.terminate():
+        #     t.train()
+        #     t.test()
+        #
+        # checkpoint.done()
 
 

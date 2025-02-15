@@ -21,8 +21,16 @@ parser.add_argument('--modal1', type=str, default='T1',
                     help='name of modal 1')
 parser.add_argument('--modal2', type=str, default='DTI',
                     help='name of modal 2')
+parser.add_argument('--train_ratio',type=float, default=0.8,
+                    help='train_ratio')
+parser.add_argument('--val_ratio',type=float, default=0.05,
+                    help='val_ratio')
+parser.add_argument('--test_ratio',type=float, default=0.15,
+                    help='test_ratio')
 
 # Training specifications
+parser.add_argument('--reset', action='store_true',
+                    help='reset the training')
 parser.add_argument('--epochs', type=int, default=200,
                     help='number of epochs to train')
 parser.add_argument('--batch_size', type=int, default=2,

@@ -52,7 +52,7 @@ class checkpoint():
             if not os.path.exists(self.dir):
                 args.load = '.'
             else:
-                self.log = torch.load(self.dir + '/psnr_log.pt')
+                self.log = torch.load(self.dir + '/log.pt')
                 print('Continue from epoch {}...'.format(len(self.log)))
 
         if args.reset:
@@ -79,8 +79,7 @@ class checkpoint():
         trainer.loss.save(self.dir)
         trainer.loss.plot_loss(self.dir, epoch)
 
-        self.plot_psnr(epoch)
-        torch.save(self.log, os.path.join(self.dir, 'psnr_log.pt'))
+        torch.save(self.log, os.path.join(self.dir, 'log.pt'))
         torch.save(
             trainer.optimizer.state_dict(),
             os.path.join(self.dir, 'optimizer.pt')
