@@ -27,27 +27,28 @@ if __name__ == '__main__':
         dataset_size = len(full_dataset)
         train_ratio = args.train_ratio  # 训练集比例
         val_ratio = args.val_ratio  # 验证集比例
-        #test_ratio = 0.15  # 测试集比例
+        test_ratio = args.test_ratio  # 测试集比例
 
         train_size = int(train_ratio * dataset_size)
         val_size = int(val_ratio * dataset_size)
-        #test_size = dataset_size - train_size - val_size
+        test_size = dataset_size - train_size - val_size
         print("train_size:",train_size, "val_size:",val_size)
 
         indices = list(range(dataset_size))
         train_indices = indices[:train_size]
         val_indices = indices[train_size:train_size + val_size]
-        #test_indices = indices[train_size + val_size:]
+        test_indices = indices[train_size + val_size:]
 
         # create new dateset
         train_dataset = Subset(full_dataset, train_indices)
         val_dataset = Subset(full_dataset, val_indices)
-        #test_dataset = Subset(full_dataset, test_indices)
+        test_dataset = Subset(full_dataset, test_indices)
 
         # create new dataloader
         train_loader = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True, pin_memory=not args.cpu)
         val_loader = DataLoader(val_dataset, batch_size=args.batch_size, shuffle=False, pin_memory=not args.cpu)
-        #test_loader = DataLoader(test_dataset, batch_size=args.batch_size, shuffle=False, pin_memory=not args.cpu)
+        test_loader = DataLoader(test_dataset, batch_size=args.batch_size, shuffle=False, pin_memory=not args.cpu)
+
         # 打印训练集数据信息
         # print("Training data:")
         # for images1, images2, labels, names in train_loader:
@@ -59,7 +60,10 @@ if __name__ == '__main__':
         model = models.Model(args)
 
         loss = loss.Loss(args, checkpoint) if not args.test_only else None
-        t = Trainer(args, train_loader, val_loader, model, loss, checkpoint)
+        if args.test_only:
+            t = Trainer(args, train_loader, val_loader, model, loss, checkpoint)
+        else:
+            t = Trainer(args, train_loader, test_loader, model, loss, checkpoint)
         while not t.terminate():
             t.train()
             t.test()

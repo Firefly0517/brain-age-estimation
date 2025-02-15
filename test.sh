@@ -9,5 +9,6 @@ python main.py --data_dir="./data" \
                --epochs=200 \
                --batch_size=2 \
                --lr=1e-3 \
-               --pre_train=None \
-               --n_GPU=1
+               --pre_train="./experiment/firefly/model/model_best.pt" \
+               --n_GPU=1 \
+               --test_only
