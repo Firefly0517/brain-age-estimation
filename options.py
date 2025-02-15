@@ -38,8 +38,16 @@ parser.add_argument('--batch_size', type=int, default=2,
 parser.add_argument('--test_only', action='store_true',
                     help='set this option to test the model')
 
+# Model specifications
+parser.add_argument('--model', default='META',
+                    help='model name')
+parser.add_argument('--act', type=str, default='relu',
+                    help='activation function')
+parser.add_argument('--pre_train', type=str, default= 'model/xxxx.pt',
+                    help='pre-trained model directory')
+
 # Optimization specifications
-parser.add_argument('--lr', type=float, default=1e-4,
+parser.add_argument('--lr', type=float, default=1e-3,
                     help='learning rate')
 parser.add_argument('--lr_decay', type=int, default=40,
                     help='learning rate decay per N epochs')
@@ -64,18 +72,18 @@ parser.add_argument('--start_epoch', type=int, default=0,
                     help='resume from the snapshot, and the start_epoch')
 
 # Loss specifications
-parser.add_argument('--loss', type=str, default='1*L1',
+parser.add_argument('--loss', type=str, default='1*MSE',
                     help='loss function configuration')
 
 # Log specifications
+parser.add_argument('--save_models', action='store_true',
+                    help='save all intermediate models')
 parser.add_argument('--save', type=str, default='firefly',
                     help='file name to save')
 parser.add_argument('--load', type=str, default='.',
                     help='file name to load')
 parser.add_argument('--resume', type=int, default=0,
                     help='resume from specific checkpoint')
-parser.add_argument('--save_models', action='store_true',
-                    help='save all intermediate models')
 parser.add_argument('--print_every', type=int, default=200,
                     help='how many batches to wait before logging training status')
 parser.add_argument('--save_results', action='store_true',
