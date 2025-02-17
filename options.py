@@ -39,7 +39,7 @@ parser.add_argument('--test_only', action='store_true',
                     help='set this option to test the model')
 
 # Model specifications
-parser.add_argument('--model', default='META',
+parser.add_argument('--model', default='demo',
                     help='model name')
 parser.add_argument('--act', type=str, default='relu',
                     help='activation function')

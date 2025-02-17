@@ -3,6 +3,7 @@ python main.py --data_dir="./data" \
                --save="firefly" \
                --modal1="T1" \
                --modal2="DTI" \
+               --model="segmamba" \
                --train_ratio=0.8 \
                --val_ratio=0.05 \
                --test_ratio=0.15 \
