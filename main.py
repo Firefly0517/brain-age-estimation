@@ -57,7 +57,7 @@ if __name__ == '__main__':
         # torch.Size([2, 1, 160, 192, 160]) batch=2 channel=1
 
 
-        model = models.Model(args)
+        model = models.Model(args, checkpoint)
 
         loss = loss.Loss(args, checkpoint) if not args.test_only else None
         if args.test_only:

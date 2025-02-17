@@ -12,6 +12,8 @@ parser.add_argument('--n_GPUs', type=int, default=2,
                     help='number of GPUs')
 parser.add_argument('--seed', type=int, default=1,
                     help='random seed')
+parser.add_argument('--gpu_ids', type=int, nargs='+', default=[0],
+                    help='list of gpu ids')
 
 
 # Data specifications
@@ -74,6 +76,8 @@ parser.add_argument('--start_epoch', type=int, default=0,
 # Loss specifications
 parser.add_argument('--loss', type=str, default='1*MSE',
                     help='loss function configuration')
+parser.add_argument('--skip_threshold', type=float, default='1e6',
+                    help='skipping batch that has large error')
 
 # Log specifications
 parser.add_argument('--save_models', action='store_true',

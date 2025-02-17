@@ -20,7 +20,7 @@ class Trainer():
         self.loss = my_loss
         self.optimizer = utility.make_optimizer(args, self.model)
         self.scheduler = utility.make_scheduler(args, self.optimizer)
-
+        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         if self.args.load != '.':
             self.optimizer.load_state_dict(
                 torch.load(os.path.join(ckp.dir, 'optimizer.pt'))
@@ -65,11 +65,19 @@ class Trainer():
             # inference
             self.model.get_model()
 
-            pred_age = self.model(img1, img2)
+            # print("img1_shape:", img1.shape)
+            img1 = img1.float()
+            img1 = img1.to(self.device)
+            img2 = img2.float()
+            img2 = img2.to(self.device)
+            pred_age = self.model(img1)
 
+            pred_age = pred_age.to(self.device).float()
+            true_age = true_age.to(self.device).float()
+            print(f"pred_age: {pred_age}, true_age: {true_age}")
             # loss function
             loss = self.loss(pred_age, true_age)
-
+            print("loss", loss)
             # backward
             if loss.item() < self.args.skip_threshold * self.error_last:
                 loss.backward()

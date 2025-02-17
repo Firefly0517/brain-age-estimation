@@ -12,4 +12,5 @@ python main.py --data_dir="./data" \
                --lr=1e-3 \
                --pre_train="./experiment/firefly/model/model_best.pt" \
                --n_GPU=1 \
+               --gpu_ids 0 \
                --test_only

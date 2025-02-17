@@ -65,7 +65,7 @@ class Loss(nn.modules.loss._Loss):
 
         device = torch.device('cpu' if args.cpu else 'cuda')
         self.loss_module.to(device)
-        if args.precision == 'half': self.loss_module.half()
+        # if args.precision == 'half': self.loss_module.half()
         if not args.cpu and args.n_GPUs > 1:
             self.loss_module = nn.DataParallel(
                 self.loss_module, range(args.n_GPUs)
@@ -73,20 +73,21 @@ class Loss(nn.modules.loss._Loss):
 
         if args.load != '.': self.load(ckp.dir, cpu=args.cpu)
 
-    def forward(self, sr, refsr, FSsr, hr, refhr, shape1, shape2):
+    def forward(self, pred_age, true_age):
         losses = []
         for i, l in enumerate(self.loss):
             if l['function'] is not None:
                 if l['type'] == 'L1':
-                    loss = 1 * l['function'](sr, hr)
+                    loss = 1 * l['function'](pred_age, true_age)
                     effective_loss = l['weight'] * loss
                     losses.append(effective_loss)
 
                     self.log[-1, i] += effective_loss.item()
-                elif l['type'] == 'KLoss':
-                    loss = l['function'](sr, FSsr, hr, shape1, shape2)
+                elif l['type'] == 'MSE':
+                    loss = 1 * l['function'](pred_age, true_age)
                     effective_loss = l['weight'] * loss
                     losses.append(effective_loss)
+
                     self.log[-1, i] += effective_loss.item()
             elif l['type'] == 'DIS':
                 self.log[-1, i] += self.loss[i - 1]['function'].loss

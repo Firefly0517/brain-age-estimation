@@ -9,10 +9,10 @@ class Model(nn.Module):
         print('Making model...')
 
         self.n_GPUs = args.n_GPUs
-        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        self.device = torch.device(f"cuda" if torch.cuda.is_available() else "cpu")
         self.save_models = args.save_models
 
-        module = import_module('model.' + args.model.lower())
+        module = import_module('models.' + args.model.lower())
         self.model = module.make_model(args).to(self.device)
 
         if not args.cpu and args.n_GPUs > 1:

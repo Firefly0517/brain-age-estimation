@@ -1,4 +1,4 @@
-python main.py --data_dir="./data" \
+python main.py --data_dir="../IXI" \
                --loss="1*MSE" \
                --save="firefly" \
                --modal1="T1" \
@@ -8,7 +8,8 @@ python main.py --data_dir="./data" \
                --val_ratio=0.05 \
                --test_ratio=0.15 \
                --epochs=200 \
-               --batch_size=2 \
+               --batch_size=4 \
                --lr=1e-3 \
                --pre_train=None \
-               --n_GPU=1
+               --n_GPU=1 \
+               --gpu_ids 0

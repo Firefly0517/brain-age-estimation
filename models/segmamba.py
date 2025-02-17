@@ -8,6 +8,8 @@ from monai.networks.blocks.unetr_block import UnetrBasicBlock, UnetrUpBlock
 from mamba_ssm import Mamba
 import torch.nn.functional as F
 
+def make_model(args):
+    return SegMamba(in_chans=1,out_chans=1)
 
 class LayerNorm(nn.Module):
     r""" LayerNorm that supports two data formats: channels_last (default) or channels_first.
@@ -48,8 +50,8 @@ class MambaLayer(nn.Module):
             d_state=d_state,  # SSM state expansion factor
             d_conv=d_conv,  # Local convolution width
             expand=expand,  # Block expansion factor
-            bimamba_type="v3",
-            nslices=num_slices,
+
+            # nslices=num_slices,
         )
 
     def forward(self, x):
@@ -186,6 +188,33 @@ class MambaEncoder(nn.Module):
         x = self.forward_features(x)
         return x
 
+class LastConvMlp(nn.Module):
+    def __init__(self, in_channels, conv_channels, kernel_size = 3, stride = 1, padding = 1):
+        super(LastConvMlp, self).__init__()
+
+        self.conv3d = nn.Conv3d(in_channels, conv_channels, kernel_size=kernel_size,
+                                stride=stride, padding=padding)
+        self.relu = nn.ReLU()
+        self.global_avg_pool = nn.AdaptiveAvgPool3d((1, 1, 1))
+        self.fc = nn.Linear(conv_channels, 1)
+
+    def forward(self, x):
+        x = self.conv3d(x)
+        x = self.relu(x)
+        x = self.global_avg_pool(x)
+        x = x.view(x.shape[0], -1) # size [batch_size, channel_size]
+        x = self.fc(x).flatten() # size [1]
+        return x
+
+class firstdownsample(nn.Module):
+    def __init__(self, kernel_size=2, stride=2):
+        super().__init__()
+        self.avg_pool = nn.AvgPool3d(kernel_size=kernel_size, stride=stride)
+
+    def forward(self, x):
+        # 对输入的 3D 图像进行下采样
+        x = self.avg_pool(x)
+        return x
 
 class SegMamba(nn.Module):
     def __init__(
@@ -213,6 +242,9 @@ class SegMamba(nn.Module):
         self.layer_scale_init_value = layer_scale_init_value
 
         self.spatial_dims = spatial_dims
+
+        self.firstdownsample = firstdownsample(kernel_size=2, stride=2)
+        self.LastConvMlp = LastConvMlp(in_channels=1, conv_channels=64, kernel_size=3, stride=1, padding=1)
         self.vit = MambaEncoder(in_chans,
                                 depths=depths,
                                 dims=feat_size,
@@ -320,6 +352,7 @@ class SegMamba(nn.Module):
         return x
 
     def forward(self, x_in):
+        x_in = self.firstdownsample(x_in) # downsample x2
         outs = self.vit(x_in)
         enc1 = self.encoder1(x_in)
         x2 = outs[0]
@@ -334,5 +367,7 @@ class SegMamba(nn.Module):
         dec1 = self.decoder3(dec2, enc2)
         dec0 = self.decoder2(dec1, enc1)
         out = self.decoder1(dec0)
+        out = self.out(out)
+        out = self.LastConvMlp(out) # torch.Size([1])
 
-        return self.out(out)
+        return out
