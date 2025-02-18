@@ -57,7 +57,7 @@ class Trainer():
 
         self.ckp.write_log('[Epoch {}]\tLearning rate: {:.2e}'.format(epoch, Decimal(lr)))
 
-        for batch, (img1, img2, true_age, name) in enumerate(self.loader_train):
+        for batch, (img1, img2, true_age, name) in enumerate(tqdm(self.loader_train, desc="Training")):
 
             timer_data.hold()
             self.optimizer.zero_grad()
@@ -71,7 +71,7 @@ class Trainer():
             img2 = img2.float()
             img2 = img2.to(self.device)
             pred_age = self.model(img1, img2)
-
+            print("pred_age_shape", pred_age)
             pred_age = pred_age.to(self.device).float()
             true_age = true_age.to(self.device).float()
             print(f"pred_age: {pred_age}, true_age: {true_age}")
@@ -127,7 +127,15 @@ class Trainer():
             true_age_list = []
 
             for idx_img, (img1, img2, true_age, name) in tqdm(enumerate(self.loader_test), total=len(self.loader_test)):
+                img1 = img1.float()
+                img1 = img1.to(self.device)
+                img2 = img2.float()
+                img2 = img2.to(self.device)
+
                 pred_age = self.model(img1, img2)
+                pred_age = pred_age.to(self.device).float()
+                true_age = true_age.to(self.device).float()
+
                 pred_age_list.append(pred_age)
                 true_age_list.append(true_age)
 

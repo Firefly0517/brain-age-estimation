@@ -1,4 +1,4 @@
-python main.py --data_dir="./data" \
+python main.py --data_dir="../IXI" \
                --loss="1*MSE" \
                --save="firefly" \
                --modal1="T1" \
