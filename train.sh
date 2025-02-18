@@ -1,14 +1,14 @@
-python main.py --data_dir="../IXI" \
+python main.py --data_dir="./data" \
                --loss="1*MSE" \
                --save="firefly" \
                --modal1="T1" \
                --modal2="DTI" \
-               --model="segmamba" \
+               --model="mymodel" \
                --train_ratio=0.8 \
                --val_ratio=0.05 \
                --test_ratio=0.15 \
                --epochs=200 \
-               --batch_size=4 \
+               --batch_size=1 \
                --lr=1e-3 \
                --pre_train=None \
                --n_GPU=1 \

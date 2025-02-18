@@ -39,6 +39,8 @@ parser.add_argument('--batch_size', type=int, default=2,
                     help='input batch size for training')
 parser.add_argument('--test_only', action='store_true',
                     help='set this option to test the model')
+parser.add_argument('--num_blocks', type=int, default=4,
+                    help='number of total block')
 
 # Model specifications
 parser.add_argument('--model', default='demo',
