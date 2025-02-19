@@ -131,7 +131,7 @@ class MambaEncoder(nn.Module):
         self.downsample_layers.append(stem)
         for i in range(3):
             downsample_layer = nn.Sequential(
-                # LayerNorm(dims[i], eps=1e-6, data_format="channels_first"),
+                LayerNorm(dims[i], eps=1e-6, data_format="channels_first"),
                 nn.InstanceNorm3d(dims[i]),
                 nn.Conv3d(dims[i], dims[i + 1], kernel_size=2, stride=2),
             )
@@ -202,7 +202,6 @@ class mymodel(nn.Module):
     def __init__(self, args):
         super().__init__()
         self.num_blocks = args.num_blocks
-        self.
         self.conv_first_layers = nn.ModuleList([
             nn.Conv3d(in_channels=dim, out_channels=dim, kernel_size=1)
             for dim in [48, 96, 192, 384]
@@ -213,12 +212,12 @@ class mymodel(nn.Module):
         ])
         self.MambaEncoder = MambaEncoder()
         self.conv1x1x1_layers = nn.ModuleList([
-            nn.Conv3d(channel_dim, 40, kernel_size=1)
+            nn.Conv3d(channel_dim, 100, kernel_size=1)
             for channel_dim in [48, 96, 192, 384]
         ])
 
         self.mlp = nn.Sequential(
-            nn.Linear(40, 128),  # 40 -> 128
+            nn.Linear(100, 128),  # 40 -> 128
             nn.ReLU(),
             nn.Linear(128, 1)  # 128 -> 1 (最终的脑龄预测)
         )
@@ -241,21 +240,17 @@ class mymodel(nn.Module):
         for i in range(self.num_blocks):
             # 全局平均池化
             x = enc[i]
-            x = F.adaptive_avg_pool3d(x, (1, 1, 1))  # 变成 [batch_size, channels, 1, 1, 1]
-            # 1x1x1 卷积映射到年龄区间
-            x = self.conv1x1x1_layers[i](x)
-            # print("x3.shape",x.shape) # [1, 40, 1, 1, 1]
-            # 软最大归一化得到年龄概率分布
+            x = F.adaptive_avg_pool3d(x, (1, 1, 1))  #  [batch_size, channels, 1, 1, 1]
+            x = self.conv1x1x1_layers[i](x) # [1, 100, 1, 1, 1]
             x = x.view(x.shape[0], -1)
-            # print("x4.shape",x.shape) [1, 40]
-            x = self.mlp(x)
+            # print("x4.shape",x.shape) # [1, 100]
+            x = self.mlp(x) # [1, 1]
             #x = F.log_softmax(x, dim=1)
-            # 由于卷积后输出仍然是 [batch_size, 40, 1, 1, 1]，我们去掉多余的维度
-            x = x.squeeze(-1).squeeze(-1).squeeze(-1)  # 最终变成 [batch_size, 40]
-            # print("x2shape", x.shape)
+            x = x.view(x.shape[0], x.shape[1])  # 最终变成 [batch_size, 100]
+            # print("x2shape", x.shape) [batch_size, 1]
             out.append(x)
         out = torch.stack(out, dim = 0)
-        out = out.sum(dim = 0).unsqueeze(0)
+        out = out.sum(dim = 0)
         print("out.shape:",out.shape)
         return out
 

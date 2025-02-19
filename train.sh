@@ -1,5 +1,5 @@
 python main.py --data_dir="../IXI" \
-               --loss="1*MSE" \
+               --loss="1*L1" \
                --save="firefly" \
                --modal1="T1" \
                --modal2="DTI" \
@@ -9,7 +9,8 @@ python main.py --data_dir="../IXI" \
                --test_ratio=0.15 \
                --epochs=200 \
                --batch_size=1 \
-               --lr=1e-3 \
+               --lr=5e-4 \
                --pre_train=None \
-               --n_GPU=1 \
-               --gpu_ids 0
+               --n_GPUs=1 \
+               --gpu_ids 0 \
+               --weight_decay=5e-4

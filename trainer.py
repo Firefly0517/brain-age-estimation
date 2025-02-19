@@ -71,10 +71,9 @@ class Trainer():
             img2 = img2.float()
             img2 = img2.to(self.device)
             pred_age = self.model(img1, img2)
-            print("pred_age_shape", pred_age)
             pred_age = pred_age.to(self.device).float()
             true_age = true_age.to(self.device).float()
-            print(f"pred_age: {pred_age}, true_age: {true_age}")
+            print(f"pred_age: {pred_age}\n true_age: {true_age}")
             # loss function
             loss = self.loss(pred_age, true_age)
             print("loss", loss)

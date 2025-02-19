@@ -61,9 +61,9 @@ if __name__ == '__main__':
 
         loss = loss.Loss(args, checkpoint) if not args.test_only else None
         if args.test_only:
-            t = Trainer(args, train_loader, val_loader, model, loss, checkpoint)
-        else:
             t = Trainer(args, train_loader, test_loader, model, loss, checkpoint)
+        else:
+            t = Trainer(args, train_loader, val_loader, model, loss, checkpoint)
         while not t.terminate():
             t.train()
             t.test()
