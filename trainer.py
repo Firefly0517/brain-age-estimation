@@ -28,7 +28,7 @@ class Trainer():
             for _ in range(len(ckp.log)): self.scheduler.step()
 
         self.error_last = 1e8
-
+        self.mse_max = None
 
     def train(self):
         self.scheduler.step()
@@ -139,6 +139,10 @@ class Trainer():
                 pred_age_list.append(pred_age)
                 true_age_list.append(true_age)
 
+                mse = F.mse_loss(pred_age, true_age)
+                mae = F.l1_loss(pred_age, true_age)
+                print(f"Batch {idx_img}: MSE = {mse.item():.4f}, MAE = {mae.item():.4f}")
+
             # 将预测年龄和真实年龄列表转换为张量
             pred_ages = torch.cat(pred_age_list, dim=0)
             true_ages = torch.cat(true_age_list, dim=0)
@@ -147,8 +151,8 @@ class Trainer():
             mse = F.mse_loss(pred_ages, true_ages).item()
             mae = F.l1_loss(pred_ages, true_ages).item()
 
-            logger('[{}]\tMSE: {:.4f} MAE: {:.4f}'.format(
-                self.args.data_test,
+            print(f"mean_mse:{mse}, mean_mae:{mae}")
+            logger('MSE: {:.4f} MAE: {:.4f}'.format(
                 mse,
                 mae
             ))

@@ -202,6 +202,7 @@ class mymodel(nn.Module):
     def __init__(self, args):
         super().__init__()
         self.num_blocks = args.num_blocks
+        self.
         self.conv_first_layers = nn.ModuleList([
             nn.Conv3d(in_channels=dim, out_channels=dim, kernel_size=1)
             for dim in [48, 96, 192, 384]
@@ -233,8 +234,8 @@ class mymodel(nn.Module):
             upsampled.append(x_upsampled)
         for i in range(self.num_blocks - 1):
             enc[i] = enc[i] + upsampled[i + 1]
-            print("x1.shape",enc[i].shape)
-            print("upsampled.shape",upsampled[i + 1].shape)
+            # print("x1.shape",enc[i].shape)
+            # print("upsampled.shape",upsampled[i + 1].shape)
 
         out = []
         for i in range(self.num_blocks):
@@ -254,6 +255,7 @@ class mymodel(nn.Module):
             # print("x2shape", x.shape)
             out.append(x)
         out = torch.stack(out, dim = 0)
-        out = out.mean(dim = 0)
+        out = out.sum(dim = 0).unsqueeze(0)
+        print("out.shape:",out.shape)
         return out
 
