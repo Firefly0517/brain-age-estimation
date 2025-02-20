@@ -198,6 +198,61 @@ class MambaEncoder(nn.Module):
         x = self.forward_features(x, y, flag)
         return x
 
+
+class MultiScale3DNet(nn.Module):
+    def __init__(self):
+        super().__init__()
+
+        # 分支1处理：48通道输入
+        self.branch1 = nn.Sequential(
+            nn.Conv3d(48, 24, kernel_size=3, stride=2, padding=1),  # [1,24,40,48,40]
+            nn.ReLU(),
+            nn.AdaptiveAvgPool3d(1),  # 全局平均池化 [1,24,1,1,1]
+            nn.Flatten(),
+            nn.Linear(24, 16),
+            nn.ReLU(),
+            nn.Linear(16, 1)
+        )
+        # 分支2处理：96通道输入
+        self.branch2 = nn.Sequential(
+            nn.Conv3d(96, 48, kernel_size=3, stride=2, padding=1),  # [1,48,20,24,20]
+            nn.ReLU(),
+            nn.AdaptiveAvgPool3d(1),
+            nn.Flatten(),
+            nn.Linear(48, 24),
+            nn.ReLU(),
+            nn.Linear(24, 1))
+
+        # 分支3处理：192通道输入
+        self.branch3 = nn.Sequential(
+            nn.Conv3d(192, 96, kernel_size=3, padding=1),  # 保持空间维度 [1,96,20,24,20]
+            nn.ReLU(),
+            nn.AdaptiveAvgPool3d(1),
+            nn.Flatten(),
+            nn.Linear(96, 48),
+            nn.ReLU(),
+            nn.Linear(48, 1))
+
+        # 分支4处理：384通道输入
+        self.branch4 = nn.Sequential(
+            nn.Conv3d(384, 192, kernel_size=3, padding=1),  # [1,192,10,12,10]
+            nn.ReLU(),
+            nn.AdaptiveAvgPool3d(1),
+            nn.Flatten(),
+            nn.Linear(192, 96),
+            nn.ReLU(),
+            nn.Linear(96, 1))
+
+    def forward(self, x1, x2, x3, x4):
+        # 各分支独立处理
+        out1 = self.branch1(x1)  # [1,1]
+        out2 = self.branch2(x2)  # [1,1]
+        out3 = self.branch3(x3)  # [1,1]
+        out4 = self.branch4(x4)  # [1,1]
+
+        return out1 + out2 + out3 + out4
+
+
 class mymodel(nn.Module):
     def __init__(self, args):
         super().__init__()
@@ -221,6 +276,11 @@ class mymodel(nn.Module):
             nn.ReLU(),
             nn.Linear(128, 1)  # 128 -> 1 (最终的脑龄预测)
         )
+        self.GSCs = nn.ModuleList([
+            GSC(dim)
+            for dim in [48, 96, 192, 384]
+        ])
+        self.MultiScale3DNet = MultiScale3DNet()
 
     def forward(self, x1, x2):
         enc_modal2 = self.MambaEncoder(x2, x2, 0) # DTI
@@ -237,20 +297,23 @@ class mymodel(nn.Module):
             # print("upsampled.shape",upsampled[i + 1].shape)
 
         out = []
+        # for i in range(self.num_blocks):
+        #     x = enc[i]
+        #     print("x_shape:", x.shape)
+        #     x = F.adaptive_avg_pool3d(x, (1, 1, 1))  #  [batch_size, channels, 1, 1, 1]
+        #     x = self.conv1x1x1_layers[i](x) # [1, 100, 1, 1, 1]
+        #     x = x.view(x.shape[0], -1)
+        #     # print("x4.shape",x.shape) # [1, 100]
+        #     x = self.mlp(x) # [1, 1]
+        #     #x = F.log_softmax(x, dim=1)
+        #     x = x.view(x.shape[0], x.shape[1])  # 最终变成 [batch_size, 100]
+        #     # print("x2shape", x.shape) [batch_size, 1]
+        #     out.append(x)
         for i in range(self.num_blocks):
-            # 全局平均池化
-            x = enc[i]
-            x = F.adaptive_avg_pool3d(x, (1, 1, 1))  #  [batch_size, channels, 1, 1, 1]
-            x = self.conv1x1x1_layers[i](x) # [1, 100, 1, 1, 1]
-            x = x.view(x.shape[0], -1)
-            # print("x4.shape",x.shape) # [1, 100]
-            x = self.mlp(x) # [1, 1]
-            #x = F.log_softmax(x, dim=1)
-            x = x.view(x.shape[0], x.shape[1])  # 最终变成 [batch_size, 100]
-            # print("x2shape", x.shape) [batch_size, 1]
-            out.append(x)
-        out = torch.stack(out, dim = 0)
-        out = out.sum(dim = 0)
-        print("out.shape:",out.shape)
+            enc[i] = self.GSCs[i](enc[i])
+            # print(enc[i].shape)
+        out = self.MultiScale3DNet(enc[0], enc[1], enc[2], enc[3])
+
         return out
+
 
