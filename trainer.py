@@ -28,7 +28,7 @@ class Trainer():
             for _ in range(len(ckp.log)): self.scheduler.step()
 
         self.error_last = 1e8
-        self.mse_max = None
+        self.mse_min = None
 
     def train(self):
         self.scheduler.step()
@@ -157,8 +157,8 @@ class Trainer():
             ))
 
         if not self.args.test_only: #training mode and save the best model
-            if self.mse_max is None or self.mse_max < mse:
-                self.mse_max = mse
+            if self.mse_min is None or self.mse_min > mse:
+                self.mse_min = mse
                 torch.save(
                     self.model.state_dict(),
                     os.path.join(self.ckp.dir, 'model', 'model_best.pt')
