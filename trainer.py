@@ -144,8 +144,9 @@ class Trainer():
 
             # 将预测年龄和真实年龄列表转换为张量
             pred_ages = torch.cat(pred_age_list, dim=0)
+            print("pred_ages_shape", pred_ages.shape)
             true_ages = torch.cat(true_age_list, dim=0)
-
+            print("true_ages_shape", true_ages.shape)
             # 计算 MSE 和 MAE
             mse = F.mse_loss(pred_ages, true_ages).item()
             mae = F.l1_loss(pred_ages, true_ages).item()

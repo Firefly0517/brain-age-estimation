@@ -287,6 +287,7 @@ class mymodel(nn.Module):
         enc = self.MambaEncoder(x1, enc_modal2, 1) # T1 & DTI
         upsampled = []
 
+
         for i in range(self.num_blocks):
             enc[i] = self.conv_first_layers[i](enc[i])
             x_upsampled = self.upsample_layers[i](enc[i])
