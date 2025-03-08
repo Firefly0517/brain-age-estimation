@@ -6,7 +6,7 @@ from mamba_ssm import Mamba
 def make_model(args):
     return MambaNet(args)
 
-class
+
 class MambaBlock(nn.Module):
     def __init__(self, args, channels, mlp_ratio=4):
         """
@@ -84,3 +84,11 @@ class MambaNet(nn.Module):
         x = x.squeeze(-1).squeeze(-1)
         x = self.fc(x)
         return x
+
+if __name__ == '__main__':
+    model = MambaNet(None)
+    model = model.to('cuda')
+    x = torch.randn(1, 1, 224, 224)
+    x = x.to('cuda')
+    y = model(x)
+    print(y)
