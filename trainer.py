@@ -67,6 +67,8 @@ class Trainer():
 
             # print("img1_shape:", img1.shape)
             img1 = img1.float()
+            print('img1.min', img1.min())
+            print('img1.max', img1.max())
             img1 = img1.to(self.device)
             img2 = img2.float()
             img2 = img2.to(self.device)
@@ -80,6 +82,37 @@ class Trainer():
             # backward
             if loss.item() < self.args.skip_threshold * self.error_last:
                 loss.backward()
+
+                ######################## 新增梯度监控部分 ########################
+                grad_norms = []
+                grad_max = []
+                grad_min = []
+                grad_std = []
+
+                for name, param in self.model.named_parameters():
+                    if param.grad is not None:
+                        grad = param.grad.data
+                        grad_norms.append(grad.norm().item())
+                        grad_max.append(grad.max().item())
+                        grad_min.append(grad.min().item())
+                        grad_std.append(grad.std().item())
+
+                # 记录梯度统计量
+                self.ckp.write_log(
+                    f'Grad Stats: '
+                    f'Mean Norm: {np.mean(grad_norms):.2e} | '
+                    f'Max: {np.max(grad_max):.2e} | '
+                    f'Min: {np.min(grad_min):.2e} | '
+                    f'Std: {np.mean(grad_std):.2e}'
+                )
+
+                # 检查梯度消失/爆炸
+                if np.mean(grad_norms) < 1e-7:
+                    self.ckp.write_log('[Warning] Gradient vanishing detected!')
+                if np.max(grad_max) > 1e3:
+                    self.ckp.write_log('[Warning] Gradient exploding detected!')
+                ################################################################
+
                 self.optimizer.step()
             else:
                 print('Skip this batch {}! (Loss: {})'.format(

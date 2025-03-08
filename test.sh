@@ -1,9 +1,9 @@
-python main.py --data_dir="../IXI" \
-               --loss="1*MSE" \
+python main.py --data_dir="../IXI_2d" \
+               --loss="1*L1" \
                --save="firefly" \
                --modal1="T1" \
                --modal2="DTI" \
-               --model="demo" \
+               --model="test1" \
                --train_ratio=0.8 \
                --val_ratio=0.05 \
                --test_ratio=0.15 \

@@ -8,7 +8,14 @@ import torch.nn as nn
 
 import copy
 import math
+import numpy as np
 
+def make_model(args):
+    return GlobalLocalBrainAge(1,
+                              patch_size=64,
+                              step=32,
+                              nblock=6,
+                              backbone='vgg8')
 
 class convBlock(nn.Module):
     def __init__(self, inplace, outplace, kernel_size=3, padding=1):
@@ -278,8 +285,8 @@ class GlobalLocalBrainAge(nn.Module):
 
                 out = self.locout(xloc)
                 outlist.append(out)
-
-        return outlist
+                out = torch.mean(torch.stack(outlist), dim=0)
+        return out
 
 
 if __name__ == '__main__':

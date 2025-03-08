@@ -7,6 +7,126 @@ def make_model(args):
     return MambaNet(args)
 
 
+class convBlock(nn.Module):
+    def __init__(self, inplace, outplace, kernel_size=3, padding=1):
+        super().__init__()
+
+        self.relu = nn.ReLU(inplace=True)
+        self.conv1 = nn.Conv2d(inplace, outplace, kernel_size=kernel_size, padding=padding, bias=False)
+        self.bn1 = nn.BatchNorm2d(outplace)
+
+    def forward(self, x):
+        x = self.conv1(x)
+        x = self.bn1(x)
+        x = self.relu(x)
+        return x
+
+
+class VGG8(nn.Module):
+    def __init__(self, inplace):
+        super().__init__()
+
+        ly = [64, 128, 256, 512]
+
+        self.ly = ly
+
+        self.maxp = nn.MaxPool2d(2)
+
+        self.conv11 = convBlock(inplace, ly[0])
+        self.conv12 = convBlock(ly[0], ly[0])
+
+        self.conv21 = convBlock(ly[0], ly[1])
+        self.conv22 = convBlock(ly[1], ly[1])
+
+        self.conv31 = convBlock(ly[1], ly[2])
+        self.conv32 = convBlock(ly[2], ly[2])
+
+        self.conv41 = convBlock(ly[2], ly[3])
+        self.conv42 = convBlock(ly[3], ly[3])
+
+    def forward(self, x):
+        x = self.conv11(x)
+        x = self.conv12(x)
+        x = self.maxp(x)
+
+        x = self.conv21(x)
+        x = self.conv22(x)
+        x = self.maxp(x)
+
+        x = self.conv31(x)
+        x = self.conv32(x)
+        x = self.maxp(x)
+
+        x = self.conv41(x)
+        x = self.conv42(x)
+        x = self.maxp(x)
+
+        return x
+
+
+def conv3x3(in_planes, out_planes, stride=1):
+    """3x3 convolution with padding"""
+    return nn.Conv2d(in_planes, out_planes, kernel_size=3, stride=stride,
+                     padding=1, bias=False)
+
+class BasicBlock(nn.Module):
+    expansion = 1
+
+    def __init__(self, inplanes, planes, stride=1, downsample=None):
+        super(BasicBlock, self).__init__()
+        self.conv1 = conv3x3(inplanes, planes, stride)
+        self.bn1 = nn.BatchNorm2d(planes)
+        self.relu = nn.ReLU(inplace=True)
+        self.conv2 = conv3x3(planes, planes)
+        self.bn2 = nn.BatchNorm2d(planes)
+        self.downsample = downsample
+        self.stride = stride
+
+    def forward(self, x):
+        residual = x
+
+        out = self.conv1(x)
+        out = self.bn1(out)
+        out = self.relu(out)
+
+        out = self.conv2(out)
+        out = self.bn2(out)
+
+        if self.downsample is not None:
+            residual = self.downsample(x)
+
+        out += residual
+        out = self.relu(out)
+
+        return out
+
+
+class BasicResBlock(nn.Module):
+    def __init__(self, in_channels, out_channels, stride=1):
+        super().__init__()
+        # 主路径
+        self.conv1 = nn.Conv2d(in_channels, out_channels, kernel_size=3, stride=stride, padding=1, bias=False)
+        self.bn1 = nn.BatchNorm2d(out_channels)
+        self.relu = nn.ReLU(inplace=True)
+        self.conv2 = nn.Conv2d(out_channels, out_channels, kernel_size=3, padding=1, bias=False)
+        self.bn2 = nn.BatchNorm2d(out_channels)
+
+        # 跳跃连接
+        self.shortcut = nn.Sequential()
+        if stride != 1 or in_channels != out_channels:
+            self.shortcut = nn.Sequential(
+                nn.Conv2d(in_channels, out_channels, kernel_size=1, stride=stride, bias=False),
+                nn.BatchNorm2d(out_channels)
+            )
+
+    def forward(self, x):
+        residual = self.shortcut(x)
+        x = self.relu(self.bn1(self.conv1(x)))
+        x = self.bn2(self.conv2(x))
+        x += residual
+        return self.relu(x)
+
+
 class MambaBlock(nn.Module):
     def __init__(self, args, channels, mlp_ratio=4):
         """
@@ -67,9 +187,8 @@ class MambaNet(nn.Module):
         super(MambaNet, self).__init__()
         self.args = args
 
-        # 初始 1x1 卷积用于调整通道数
-        self.input_proj = nn.Conv2d(in_channels, hidden_dim, kernel_size=1)
-
+        # self.input_proj = VGG8(in_channels)
+        self.input_proj = BasicResBlock(in_channels, hidden_dim)
         self.mamba_blocks = nn.Sequential(
             *[MambaBlock(args, hidden_dim) for _ in range(6)]
         )
