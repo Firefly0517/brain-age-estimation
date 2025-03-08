@@ -1,30 +1,25 @@
 import numpy as np
+import os
 import matplotlib.pyplot as plt
-import matplotlib
-
-matplotlib.use('TkAgg')  # 强制使用 TkAgg 后端
-
-
 
 def load_npy(file_path):
-    # 加载.npy文件
+    """ 加载 .npy 文件 """
     return np.load(file_path)
 
-
 def slice_mri_data(data):
-    # 获取数据的形状
+    """ 获取 MRI 数据的三个方向切片 """
     x, y, z = data.shape
-
-    # 在三个方向中间切片
-    axial_slice = data[x // 2, :, :]  # 轴向切片 (沿着X轴切片)
-    coronal_slice = data[:, y // 2, :]  # 冠状面切片 (沿着Y轴切片)
-    sagittal_slice = data[:, :, z // 2]  # 矢状面切片 (沿着Z轴切片)
-
+    axial_slice = data[x // 2, :, :]  # 轴向 (X)
+    coronal_slice = data[:, y // 2, :]  # 冠状 (Y)
+    sagittal_slice = data[:, :, z // 2]  # 矢状 (Z)
     return axial_slice, coronal_slice, sagittal_slice
 
+def save_slice(slice_data, save_path):
+    """ 保存切片为 .npy 文件 """
+    np.save(save_path, slice_data)
 
-def display_slices(axial, coronal, sagittal):
-    # 使用Matplotlib展示三个方向的切片
+def display_slices(axial, coronal, sagittal, save_path):
+    """ 保存切片的展示图像 """
     fig, axes = plt.subplots(1, 3, figsize=(15, 5))
 
     axes[0].imshow(axial, cmap='gray')
@@ -39,20 +34,46 @@ def display_slices(axial, coronal, sagittal):
     axes[2].set_title("Sagittal Slice")
     axes[2].axis('off')
 
-    plt.show()
+    # 保存图片而不是显示
+    plt.savefig(save_path, bbox_inches='tight')  # 保存为图像文件
+    plt.close(fig)  # 关闭图形以释放资源
 
-
-def main(file_path):
-    # 加载MRI数据
+def process_and_save_slices(file_path, output_dir):
+    """ 处理单个 .npy 文件并保存切片 """
+    # 读取数据
     mri_data = load_npy(file_path)
 
-    # 获取三个方向的切片
+    # 获取切片
     axial_slice, coronal_slice, sagittal_slice = slice_mri_data(mri_data)
 
-    # 展示切片
-    display_slices(axial_slice, coronal_slice, sagittal_slice)
+    # 获取原文件名（不带后缀）
+    file_name = os.path.splitext(os.path.basename(file_path))[0]
 
+    # 创建输出目录
+    os.makedirs(output_dir, exist_ok=True)
+
+    # 定义保存路径
+    save_paths = [
+        os.path.join(output_dir, f"{file_name}_1.png"),  # 轴向
+        os.path.join(output_dir, f"{file_name}_2.png"),  # 冠状
+        os.path.join(output_dir, f"{file_name}_3.png")  # 矢状
+    ]
+
+    # 依次保存
+    for slice_data, save_path in zip([axial_slice, coronal_slice, sagittal_slice], save_paths):
+        display_slices(slice_data, slice_data, slice_data, save_path)  # 传入保存路径
+
+    print(f"Processed: {file_path}")
+
+def batch_process_npy(input_dir, output_dir):
+    """ 批量处理目录下的所有 .npy 文件 """
+    for file_name in os.listdir(input_dir):
+        if file_name.endswith(".npy"):  # 只处理 .npy 文件
+            file_path = os.path.join(input_dir, file_name)
+            process_and_save_slices(file_path, output_dir)
 
 if __name__ == "__main__":
-    file_path = r'E:\脑龄\data\DTI\002.npy'  # 将此处路径替换为实际的npy文件路径
-    main(file_path)
+    input_dir = r"E:\脑龄\IXI\DTI"  # 你的 .npy 文件目录
+    output_dir = r"E:\脑龄\IXI_2d\DTI"  # 切片保存目录
+
+    batch_process_npy(input_dir, output_dir)

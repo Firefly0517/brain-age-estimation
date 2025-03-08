@@ -41,11 +41,11 @@ class Brain_image(image_dataset):
         label_path = os.path.join(self.data_dir, 'Age')
 
         sub_dir = os.listdir(image1_path)
-        sub_dir.sort(key=lambda x: int(x[:-4]))
+        # sub_dir.sort(key=lambda x: int(x[:-4])) # 排序
 
         # load data and label
         for name in sub_dir:
-            image1 = os.path.join(image2_path, name)
+            image1 = os.path.join(image1_path, name)
             image2 = os.path.join(image2_path, name)
             label = os.path.join(label_path, name)
             image1_list.append(image1)

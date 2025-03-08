@@ -25,8 +25,8 @@ class Model(nn.Module):
             cpu=args.cpu
         )
 
-    def forward(self, x1, x2):
-        return self.model(x1, x2)
+    def forward(self, x1):
+        return self.model(x1)
 
     def get_model(self):
         if self.n_GPUs <= 1 or self.cpu:

@@ -70,7 +70,7 @@ class Trainer():
             img1 = img1.to(self.device)
             img2 = img2.float()
             img2 = img2.to(self.device)
-            pred_age = self.model(img1, img2)
+            pred_age = self.model(img1)
             pred_age = pred_age.to(self.device).float()
             true_age = true_age.to(self.device).float()
             print(f"pred_age: {pred_age}\n true_age: {true_age}")
@@ -131,7 +131,7 @@ class Trainer():
                 img2 = img2.float()
                 img2 = img2.to(self.device)
 
-                pred_age = self.model(img1, img2)
+                pred_age = self.model(img1)
                 pred_age = pred_age.to(self.device).float()
                 true_age = true_age.to(self.device).float()
 
