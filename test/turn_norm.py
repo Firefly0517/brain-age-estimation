@@ -12,7 +12,7 @@ def max_min_normalization(data):
     max_val = np.max(data)
     if max_val - min_val == 0:
         return np.zeros_like(data)
-    return (data - min_val) / (max_val - min_val)
+    return ((data - min_val) / (max_val - min_val)).astype(np.float32)
 
 def convert_nii_to_npy(input_folder, output_folder):
     """
@@ -39,10 +39,10 @@ def convert_nii_to_npy(input_folder, output_folder):
             output_filename = os.path.splitext(os.path.splitext(filename)[0])[0] + '.npy'
             output_path = os.path.join(output_folder, output_filename)
             # 保存归一化后的 NumPy 数组
-            np.save(output_path, normalized_data)
+            np.save(output_path, normalized_data.astype(np.float32))
             print(f"Processed {filename} and saved to {output_path}")
 
 if __name__ == "__main__":
-    input_folder = "../data/DTI_original"
-    output_folder = "../data/DTI"
+    input_folder = r"E:\脑龄\ADNI\FA_Crop_Collection"
+    output_folder = r"E:\脑龄\ADNI\npy"
     convert_nii_to_npy(input_folder, output_folder)

@@ -29,6 +29,8 @@ parser.add_argument('--val_ratio',type=float, default=0.05,
                     help='val_ratio')
 parser.add_argument('--test_ratio',type=float, default=0.15,
                     help='test_ratio')
+parser.add_argument('--modal_num', type=int, default=1,
+                    help='modal number')
 
 # Training specifications
 parser.add_argument('--reset', action='store_true',

@@ -10,6 +10,7 @@ python main.py --data_dir="../IXI_2d" \
                --epochs=200 \
                --batch_size=1 \
                --lr=1e-3 \
+               --modal_num=1 \
                --pre_train="./experiment/firefly/model/model_best.pt" \
                --n_GPU=1 \
                --gpu_ids 0 \

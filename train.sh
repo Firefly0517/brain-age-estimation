@@ -1,7 +1,7 @@
 python main.py --data_dir="../IXI_2d" \
                --loss="1*L1" \
-               --save="firefly" \
-               --modal1="T1" \
+               --save="test111" \
+               --modal1="DTI" \
                --modal2="DTI" \
                --model="test1" \
                --train_ratio=0.8 \
@@ -11,6 +11,7 @@ python main.py --data_dir="../IXI_2d" \
                --batch_size=4 \
                --lr=5e-4 \
                --pre_train=None \
+               --modal_num=1 \
                --n_GPUs=1 \
                --gpu_ids 0 \
                --weight_decay=5e-4

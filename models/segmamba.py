@@ -9,7 +9,9 @@ from mamba_ssm import Mamba
 import torch.nn.functional as F
 
 def make_model(args):
-    return SegMamba(in_chans=1,out_chans=1)
+    return SegMamba(in_chans=1,
+                    out_chans=1
+                    )
 
 class LayerNorm(nn.Module):
     r""" LayerNorm that supports two data formats: channels_last (default) or channels_first.

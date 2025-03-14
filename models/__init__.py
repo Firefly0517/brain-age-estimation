@@ -8,6 +8,7 @@ class Model(nn.Module):
         super(Model, self).__init__()
         print('Making model...')
 
+        self.args = args
         self.n_GPUs = args.n_GPUs
         self.device = torch.device(f"cuda" if torch.cuda.is_available() else "cpu")
         self.save_models = args.save_models
@@ -25,8 +26,11 @@ class Model(nn.Module):
             cpu=args.cpu
         )
 
-    def forward(self, x1):
-        return self.model(x1)
+    def forward(self, x1, x2=None):
+        if self.args.modal_num == 1:
+            return self.model(x1)
+        elif self.args.modal_num == 2:
+            return self.model(x1, x2)
 
     def get_model(self):
         if self.n_GPUs <= 1 or self.cpu:
