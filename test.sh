@@ -1,6 +1,6 @@
 python main.py --data_dir="../IXI_2d" \
                --loss="1*L1" \
-               --save="firefly" \
+               --save="test111" \
                --modal1="T1" \
                --modal2="DTI" \
                --model="test1" \
@@ -11,7 +11,7 @@ python main.py --data_dir="../IXI_2d" \
                --batch_size=1 \
                --lr=1e-3 \
                --modal_num=1 \
-               --pre_train="./experiment/firefly/model/model_best.pt" \
+               --pre_train="./experiment/test111/model/model_best.pt" \
                --n_GPU=1 \
                --gpu_ids 0 \
                --test_only

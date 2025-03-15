@@ -30,10 +30,10 @@ except:
     from csms6s import selective_scan_fn, selective_scan_flop_jit
 
 # FLOPs counter not prepared fro mamba2
-try:
-    from .mamba2.ssd_minimal import selective_scan_chunk_fn
-except:
-    from mamba2.ssd_minimal import selective_scan_chunk_fn
+# try:
+#     from .mamba2.ssd_minimal import selective_scan_chunk_fn
+# except:
+#     from mamba2.ssd_minimal import selective_scan_chunk_fn
 
 
 # =====================================================
@@ -1214,6 +1214,7 @@ class VSSBlock(nn.Module):
         self.mlp_branch = mlp_ratio > 0
         self.use_checkpoint = use_checkpoint
         self.post_norm = post_norm
+        self.channel_first = channel_first
 
         if self.ssm_branch:
             self.norm = norm_layer(hidden_dim)

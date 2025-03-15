@@ -11,6 +11,16 @@ from collections import OrderedDict
 def make_model(args):
     return MambaNet(args)
 
+class Linear2d(nn.Linear):
+    def forward(self, x: torch.Tensor):
+        # B, C, H, W = x.shape
+        return F.conv2d(x, self.weight[:, :, None, None], self.bias)
+
+    def _load_from_state_dict(self, state_dict, prefix, local_metadata, strict, missing_keys, unexpected_keys,
+                              error_msgs):
+        state_dict[prefix + "weight"] = state_dict[prefix + "weight"].view(self.weight.shape)
+        return super()._load_from_state_dict(state_dict, prefix, local_metadata, strict, missing_keys, unexpected_keys,
+                                             error_msgs)
 
 class convBlock(nn.Module):
     def __init__(self, inplace, outplace, kernel_size=3, padding=1):
@@ -191,13 +201,34 @@ class MambaBlock(nn.Module):
 
         return x
 
+class Mlp(nn.Module):
+    def __init__(self, in_features, hidden_features=None, out_features=None, act_layer=nn.GELU, drop=0.,
+                 channels_first=False):
+        super().__init__()
+        out_features = out_features or in_features
+        hidden_features = hidden_features or in_features
+
+        Linear = Linear2d if channels_first else nn.Linear
+        self.fc1 = Linear(in_features, hidden_features)
+        self.act = act_layer()
+        self.fc2 = Linear(hidden_features, out_features)
+        self.drop = nn.Dropout(drop)
+
+    def forward(self, x):
+        x = self.fc1(x)
+        x = self.act(x)
+        x = self.drop(x)
+        x = self.fc2(x)
+        x = self.drop(x)
+        return x
+
 class MambaNet(nn.Module):
     def __init__(self,
                  args,
                  in_channels=1,
                  num_classes=1,
                  depths=[1, 1, 1, 1],
-                 dims=[96, 96, 96, 96],
+                 dims=[96, 192, 384, 768],
                  drop_path_rate=0.,
                  ssm_d_state=16,
                  ssm_ratio=2.0,
@@ -277,13 +308,18 @@ class MambaNet(nn.Module):
             head=nn.Linear(dims[-1], num_classes)
         ))
 
+        # 计算 Mlp 输入维度
+        mlp_in_dim = sum([dims[i] for i in range(len(depths))])
+        self.mlp = Mlp(in_features=1382400, hidden_features=256, out_features=num_classes, drop=0.1, channels_first=False)
+
         self.global_pool = nn.AdaptiveAvgPool2d(1)  # 将 (B, C, H, W) -> (B, C, 1, 1)
         self.fc = nn.Linear(dims[-1], num_classes)  # 输出标量
 
     def forward(self, x1, x2 = None):
-        features_fusion = []
+
         if(self.args.modal_num == 1):
             # 单模态处理
+            outputs = []
             x1 = self.stem(x1)
             i = 0;
             for stage, downsample in zip(self.stages, self.downsample_layers):
@@ -292,12 +328,20 @@ class MambaNet(nn.Module):
                 x1 = x1.permute(0, 2, 3, 1)
                 x1 = stage(x1)
                 x1 = x1.permute(0, 3, 1, 2)
-                # x1 = downsample(x1)
+                outputs.append(x1)
+                x1 = downsample(x1)
 
+            # 对保存的输出进行 flatten 和 concat
+            flattened_outputs = [torch.flatten(output, start_dim=1) for output in outputs]
+            # print("flatten_shape:",flattened_outputs.shape)
+            concat_output = torch.cat(flattened_outputs, dim=1)
+            print(f"concat_shape:{concat_output.shape}")
 
-            return self.regressor(x1)
-            # return self.fc(self.global_pool(x1).squeeze(-1).squeeze(-1))
+            age = self.mlp(concat_output)
+            return age
+            # return self.regressor(x1)
         elif self.args.modal_num == 2:
+            features_fusion = []
             x1 = self.stem(x1)
             x2 = self.stem(x2)
             for stage, downsample in zip(self.stages, self.downsample_layers):

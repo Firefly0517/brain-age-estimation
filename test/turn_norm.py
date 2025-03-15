@@ -43,6 +43,6 @@ def convert_nii_to_npy(input_folder, output_folder):
             print(f"Processed {filename} and saved to {output_path}")
 
 if __name__ == "__main__":
-    input_folder = r"E:\脑龄\ADNI\FA_Crop_Collection"
-    output_folder = r"E:\脑龄\ADNI\npy"
+    input_folder = r"E:\脑龄\ADNI\FA_Crop_Collection_1"
+    output_folder = r"E:\脑龄\ADNI\npy_1"
     convert_nii_to_npy(input_folder, output_folder)
