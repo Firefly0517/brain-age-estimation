@@ -57,7 +57,7 @@ class Trainer():
 
         self.ckp.write_log('[Epoch {}]\tLearning rate: {:.2e}'.format(epoch, Decimal(lr)))
 
-        for batch, (img1, img2, true_age, name) in enumerate(tqdm(self.loader_train, desc="Training")):
+        for batch, (img1, img2, true_age, gender, name) in enumerate(tqdm(self.loader_train, desc="Training")):
 
             timer_data.hold()
             self.optimizer.zero_grad()
@@ -71,6 +71,12 @@ class Trainer():
             img1 = img1.to(self.device)
             img2 = img2.float()
             img2 = img2.to(self.device)
+            if gender == :
+                gender = 1
+            elif gender == 'M':
+                gender = 0
+            else:
+                raise ValueError('Gender must be F or M')
             if self.args.modal_num == 1:
                 pred_age = self.model(img1)
             elif self.args.modal_num == 2:
@@ -160,7 +166,7 @@ class Trainer():
             pred_age_list = []
             true_age_list = []
 
-            for idx_img, (img1, img2, true_age, name) in tqdm(enumerate(self.loader_test), total=len(self.loader_test)):
+            for idx_img, (img1, img2, true_age, gender, name) in tqdm(enumerate(self.loader_test), total=len(self.loader_test)):
                 img1 = img1.float()
                 img1 = img1.to(self.device)
                 img2 = img2.float()

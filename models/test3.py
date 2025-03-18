@@ -222,6 +222,12 @@ class Mlp(nn.Module):
         x = self.drop(x)
         return x
 
+class FusionBlock(nn.Module):
+    def __init__(self, args, channels, mlp_ratio=4):
+        super().__init__()
+
+    def forward(self, x1, x2, x3 = None):
+
 class MambaNet(nn.Module):
     def __init__(self,
                  args,

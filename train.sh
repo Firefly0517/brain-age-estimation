@@ -1,9 +1,9 @@
 python main.py --data_dir="../IXI_2d" \
                --loss="1*L1" \
-               --save="test3" \
-               --modal1="T1" \
+               --save="test_single_modality_DTI" \
+               --modal1="DTI" \
                --modal2="DTI" \
-               --model="test3" \
+               --model="test1" \
                --train_ratio=0.8 \
                --val_ratio=0.05 \
                --test_ratio=0.15 \
