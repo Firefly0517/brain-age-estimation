@@ -71,12 +71,6 @@ class Trainer():
             img1 = img1.to(self.device)
             img2 = img2.float()
             img2 = img2.to(self.device)
-            if gender == :
-                gender = 1
-            elif gender == 'M':
-                gender = 0
-            else:
-                raise ValueError('Gender must be F or M')
             if self.args.modal_num == 1:
                 pred_age = self.model(img1)
             elif self.args.modal_num == 2:
