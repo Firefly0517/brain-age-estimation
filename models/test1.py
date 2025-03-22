@@ -7,9 +7,11 @@ from mamba_ssm.ops.selective_scan_interface import selective_scan_fn
 import math
 from .vmamba import VSSBlock
 from collections import OrderedDict
+from timm.models.layers import DropPath, trunc_normal_
 
 def make_model(args):
-    return MambaNet(args)
+    return MambaNet(args,
+                    dims = [96, 192, 384, 768],)
 
 
 class convBlock(nn.Module):
@@ -114,6 +116,65 @@ class BasicBlock(nn.Module):
 
         return out
 
+class TransformerBlock(nn.Module):
+    def __init__(self,
+                 hidden_dim,
+                 num_heads=4,
+                 mlp_ratio=4.0,
+                 dropout=0.1,  # 新增dropout参数
+                 attention_dropout=0.1  # 注意力专用dropout
+                 ):
+        super().__init__()
+        # 新增多个dropout层
+        self.attention_dropout = nn.Dropout(attention_dropout)
+        self.mlp_dropout = nn.Dropout(dropout)
+        self.post_dropout = nn.Dropout(dropout / 2)
+
+        # 原归一化层保持不变
+        self.norm1 = nn.LayerNorm(hidden_dim, eps=1e-6)
+        self.norm2 = nn.LayerNorm(hidden_dim, eps=1e-6)
+
+        # 修改注意力层添加dropout
+        self.attn = nn.MultiheadAttention(
+            embed_dim=hidden_dim,
+            num_heads=num_heads,
+            dropout=attention_dropout,  # 官方实现的注意力dropout
+            bias=False
+        )
+
+        # 修改MLP结构添加dropout
+        self.mlp = nn.Sequential(
+            nn.Linear(hidden_dim, int(hidden_dim * mlp_ratio)),
+            nn.GELU(),
+            self.mlp_dropout,  # MLP内部dropout
+            nn.Linear(int(hidden_dim * mlp_ratio), hidden_dim),
+            self.post_dropout  # 输出后dropout
+        )
+
+    def forward(self, x):
+        B, C, H, W = x.shape
+        x_perm = x.permute(0, 2, 3, 1)
+        x_flat = x_perm.reshape(B, H * W, C)
+
+        # 残差连接1
+        residual = x_flat
+        x_flat = self.norm1(x_flat)
+        x_flat, _ = self.attn(x_flat, x_flat, x_flat)
+        x_flat = self.attention_dropout(x_flat)  # 注意力后dropout
+        x_flat = residual + x_flat
+
+        # 残差连接2
+        residual = x_flat
+        x_flat = self.norm2(x_flat)
+        x_flat = self.mlp(x_flat)
+        x_flat = residual + x_flat
+
+        # 最终的dropout
+        x_flat = self.post_dropout(x_flat)
+
+        # 形状恢复
+        x = x_flat.reshape(B, H, W, -1).permute(0, 3, 1, 2)
+        return x
 
 
 class BasicResBlock(nn.Module):
@@ -196,11 +257,11 @@ class MambaNet(nn.Module):
                  args,
                  in_channels=1,
                  num_classes=1,
-                 depths=[1, 1, 1, 1],
-                 dims=[96, 96, 96, 96],
-                 drop_path_rate=0.,
-                 ssm_d_state=16,
-                 ssm_ratio=2.0,
+                 depths=[2, 2, 2, 2],
+                 dims=[96, 192, 384, 768],
+                 drop_path_rate=[0.1, 0.1],
+                 ssm_d_state=64,
+                 ssm_ratio=4.0,
                  ssm_conv=3,
                  ssm_conv_bias=True,
                  mlp_ratio=4.0,
@@ -214,7 +275,7 @@ class MambaNet(nn.Module):
         """
         super(MambaNet, self).__init__()
         self.args = args
-
+        self.channel_first = channel_first
         # self.stem = nn.Sequential(
         #     nn.Conv2d(in_channels, dims[0], kernel_size=patch_size, stride=patch_size, padding=(patch_size - 1) // 2),
         #     Permute(0, 2, 3, 1) if channel_first else nn.Identity(),  # 调整为 [B, H, W, C]
@@ -223,29 +284,42 @@ class MambaNet(nn.Module):
         #     nn.GELU()
         # )
 
-        self.stem = BasicResBlock(in_channels, dims[0], stride=2)
-
+        # self.stem = BasicResBlock(in_channels, dims[0], stride=2)
         # self.stem = VGG8(1)
 
         self.stages = nn.ModuleList()
         self.downsample_layers = nn.ModuleList()
-        dp_rates = [x.item() for x in torch.linspace(0, drop_path_rate, sum(depths))]
-
-        cur = 0
+        # dp_rates = [x.item() for x in torch.linspace(0, drop_path_rate, sum(depths))]
+        self.patch_embed = self.patch_embedding()
+        self.pos_embed = self.pos_embedding(dims[0])
+        self.apply(self._init_weights)
         for i in range(len(depths)):
             # 每个阶段包含多个VSSBlock
             stage = nn.Sequential(*[
-                VSSBlock(
+
+                # Permute(0, 2, 3, 1),
+                *[VSSBlock(
                     hidden_dim=dims[i],
-                    drop_path=dp_rates[cur + j],
+                    drop_path=drop_path_rate[j],
                     ssm_d_state=ssm_d_state,
                     ssm_ratio=ssm_ratio,
                     ssm_conv=ssm_conv,
                     ssm_conv_bias=ssm_conv_bias,
                     forward_type="v05_noz",
                     channel_first=False
-                ) for j in range(depths[i])
+                    ) for j in range(depths[i])
+                ],
+                # Permute(0, 3, 1, 2)
             ])
+
+            # stage = nn.Sequential(
+            #     *[TransformerBlock(
+            #         hidden_dim=dims[i],
+            #         num_heads=4,
+            #         mlp_ratio=mlp_ratio,
+            #         dropout=0.1
+            #     ) for _ in range(depths[i])]
+            # )
 
             # stage = nn.Sequential(*[
             #     MambaBlock(
@@ -255,44 +329,46 @@ class MambaNet(nn.Module):
             #     ) for j in range(depths[i])
             # ])
             self.stages.append(stage)
-            cur += depths[i]
 
             # 添加下采样层（最后一个阶段除外）
             if i < len(depths) - 1:
                 downsample = nn.Sequential(
+                    Permute(0, 3, 1, 2),
                     nn.Conv2d(dims[i], dims[i + 1], kernel_size=3, stride=2, padding=1),
                     Permute(0, 2, 3, 1),
                     nn.LayerNorm(dims[i + 1]),
-                    Permute(0, 3, 1, 2)
+
                 )
                 self.downsample_layers.append(downsample)
             else:
                 self.downsample_layers.append(nn.Identity())
 
         self.regressor = nn.Sequential(OrderedDict(
-            norm=nn.LayerNorm(dims[-1]) if not channel_first else nn.Identity(),
-            permute=Permute(0, 3, 1, 2) if not channel_first else nn.Identity(),
+            # permute1=Permute(0, 2, 3, 1) if channel_first else nn.Identity(),
+            norm=nn.LayerNorm(dims[-1]),
+            # norm=nn.BatchNorm2d(dims[-1]),
+            permute2=Permute(0, 3, 1, 2) if channel_first else nn.Identity(),
             avgpool=nn.AdaptiveAvgPool2d(1),
             flatten=nn.Flatten(1),
             head=nn.Linear(dims[-1], num_classes)
         ))
 
-        self.global_pool = nn.AdaptiveAvgPool2d(1)  # 将 (B, C, H, W) -> (B, C, 1, 1)
-        self.fc = nn.Linear(dims[-1], num_classes)  # 输出标量
-
     def forward(self, x1, x2 = None):
         features_fusion = []
         if(self.args.modal_num == 1):
             # 单模态处理
-            x1 = self.stem(x1)
+            x1 = self.patch_embed(x1)
+            if self.pos_embed is not None:
+                pos_embed = self.pos_embed.permute(0, 2, 3, 1) if self.channel_first else self.pos_embed
+                x1 = x1 + pos_embed
             i = 0;
             for stage, downsample in zip(self.stages, self.downsample_layers):
-                i += 1
-                print(f"stage{i}:, x1.shape:{x1.shape}")
-                x1 = x1.permute(0, 2, 3, 1)
+                # print(f"Before stage: {x1.shape}")
                 x1 = stage(x1)
-                x1 = x1.permute(0, 3, 1, 2)
-                # x1 = downsample(x1)
+                # print(f"After stage: {x1.shape}")
+                x1 = downsample(x1)
+                # print(f"After downsample: {x1.shape}")
+
 
 
             return self.regressor(x1)
@@ -312,7 +388,42 @@ class MambaNet(nn.Module):
                 x1 = downsample(x1)
                 x2 = downsample(x2)
 
-            return self.regressor(x1), self.regressor(x2)
+            age1 = self.regressor(x1)
+            age2 = self.regressor(x2)
+            avg_age = (age1 + age2) / 2
+            return avg_age
+
+    def patch_embedding(self, in_chans=1, embed_dim=96, patch_size=4, patch_norm=True, norm_layer=nn.LayerNorm,
+                             channel_first=True):
+        # if channel first, then Norm and Output are both channel_first
+        stride = patch_size // 2
+        kernel_size = stride + 1
+        padding = 1
+        return nn.Sequential(
+            nn.Conv2d(in_chans, embed_dim // 2, kernel_size=kernel_size, stride=stride, padding=padding),
+            Permute(0, 2, 3, 1) if channel_first else nn.Identity(),
+            (norm_layer(embed_dim // 2) if patch_norm else nn.Identity()),
+            Permute(0, 3, 1, 2) if channel_first else nn.Identity(),
+            nn.GELU(),
+            nn.Conv2d(embed_dim // 2, embed_dim, kernel_size=kernel_size, stride=stride, padding=padding),
+            Permute(0, 2, 3, 1) if channel_first else nn.Identity(),
+            (norm_layer(embed_dim) if patch_norm else nn.Identity()),
+        )
+
+    def pos_embedding(self, embed_dims, patch_size = 4, img_size1 = 160, img_size2 = 192):
+        patch_height, patch_width = (img_size1 // patch_size, img_size2 // patch_size)
+        pos_embed = nn.Parameter(torch.zeros(1, embed_dims, patch_height, patch_width))
+        trunc_normal_(pos_embed, std=0.02)
+        return pos_embed
+
+    def _init_weights(self, m: nn.Module):
+        if isinstance(m, nn.Linear):
+            trunc_normal_(m.weight, std=.02)
+            if isinstance(m, nn.Linear) and m.bias is not None:
+                nn.init.constant_(m.bias, 0)
+        elif isinstance(m, nn.LayerNorm):
+            nn.init.constant_(m.bias, 0)
+            nn.init.constant_(m.weight, 1.0)
 
 if __name__ == '__main__':
     model = MambaNet(None)

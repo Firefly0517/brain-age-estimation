@@ -1,7 +1,7 @@
 python main.py --data_dir="../IXI_2d" \
                --loss="1*L1" \
                --save="test111" \
-               --modal1="DTI" \
+               --modal1="T1" \
                --modal2="DTI" \
                --model="test1" \
                --train_ratio=0.8 \
@@ -11,7 +11,7 @@ python main.py --data_dir="../IXI_2d" \
                --batch_size=1 \
                --lr=1e-3 \
                --modal_num=1 \
-               --pre_train="./experiment/test_single_modality_DTI/model/model_best.pt" \
+               --pre_train="./experiment/test_fusion_modality/model/model_best.pt" \
                --n_GPU=1 \
-               --gpu_ids 0 \
+               --gpu_ids 1 \
                --test_only

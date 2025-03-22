@@ -10,14 +10,14 @@ class Model(nn.Module):
 
         self.args = args
         self.n_GPUs = args.n_GPUs
-        self.device = torch.device(f"cuda" if torch.cuda.is_available() else "cpu")
+        self.device = torch.device(f'cuda:{args.gpu_ids[0]}' if torch.cuda.is_available() else "cpu")
         self.save_models = args.save_models
 
         module = import_module('models.' + args.model.lower())
         self.model = module.make_model(args).to(self.device)
 
         if not args.cpu and args.n_GPUs > 1:
-            self.model = nn.DataParallel(self.model, range(args.n_GPUs))
+            self.model = nn.DataParallel(self.model, list(self.gpu_ids))
 
         self.load(
             ckp.dir,

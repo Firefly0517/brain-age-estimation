@@ -1,0 +1,33 @@
+import pandas as pd
+import numpy as np
+import os
+
+def save_age_as_npy(excel_file_path):
+    # 读取 Excel 文件
+    df = pd.read_excel(excel_file_path, engine='openpyxl')
+
+    # 确保输出目录存在
+    output_dir = '../IXI/Gender1'
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
+
+    # 遍历每一行数据
+    for index, row in df.iterrows():
+        sex = row['SEX_ID (1=m, 2=f)']
+        if sex == 1:
+            sex  = 1
+        elif sex == 2:
+            sex = 0
+        else:
+            raise ValueError("sex must be 1 or 2")
+        ixi_id = str(int(row['IXI_ID'])).zfill(3)  # 将 IXI_ID 转换为三位字符串
+        file_name = f'{ixi_id}_3.npy'
+        file_path = os.path.join(output_dir, file_name)
+
+        # 将 AGE 数据保存为 .npy 文件
+        np.save(file_path, np.array([sex]))
+        print(f'Saved {file_path}')
+
+if __name__ == "__main__":
+    excel_file_path = r'E:\脑龄\IXI\age_new.xls'  # 替换为实际的 Excel 文件路径
+    save_age_as_npy(excel_file_path)

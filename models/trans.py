@@ -14,6 +14,15 @@ def make_model(args):
     return MambaNet(args,
                     dims = [96, 96, 96, 96])
 
+class Permute(nn.Module):
+    """维度重排列模块"""
+    def __init__(self, *order):
+        super().__init__()
+        self.order = order
+
+    def forward(self, x):
+        return x.permute(*self.order)
+
 class Linear2d(nn.Linear):
     def forward(self, x: torch.Tensor):
         # B, C, H, W = x.shape
@@ -24,110 +33,6 @@ class Linear2d(nn.Linear):
         state_dict[prefix + "weight"] = state_dict[prefix + "weight"].view(self.weight.shape)
         return super()._load_from_state_dict(state_dict, prefix, local_metadata, strict, missing_keys, unexpected_keys,
                                              error_msgs)
-
-class convBlock(nn.Module):
-    def __init__(self, inplace, outplace, kernel_size=3, padding=1):
-        super().__init__()
-
-        self.relu = nn.ReLU(inplace=True)
-        self.conv1 = nn.Conv2d(inplace, outplace, kernel_size=kernel_size, padding=padding, bias=False)
-        self.bn1 = nn.BatchNorm2d(outplace)
-
-    def forward(self, x):
-        x = self.conv1(x)
-        x = self.bn1(x)
-        x = self.relu(x)
-        return x
-
-
-class Permute(nn.Module):
-    """维度重排列模块"""
-    def __init__(self, *order):
-        super().__init__()
-        self.order = order
-
-    def forward(self, x):
-        return x.permute(*self.order)
-
-class VGG8(nn.Module):
-    def __init__(self, inplace):
-        super().__init__()
-
-        ly = [64, 128, 256, 96]
-
-        self.ly = ly
-
-        self.maxp = nn.MaxPool2d(2)
-
-        self.conv11 = convBlock(inplace, ly[0])
-        self.conv12 = convBlock(ly[0], ly[0])
-
-        self.conv21 = convBlock(ly[0], ly[1])
-        self.conv22 = convBlock(ly[1], ly[1])
-
-        self.conv31 = convBlock(ly[1], ly[2])
-        self.conv32 = convBlock(ly[2], ly[2])
-
-        self.conv41 = convBlock(ly[2], ly[3])
-        self.conv42 = convBlock(ly[3], ly[3])
-
-    def forward(self, x):
-        x = self.conv11(x)
-        x = self.conv12(x)
-        x = self.maxp(x)
-
-        x = self.conv21(x)
-        x = self.conv22(x)
-        x = self.maxp(x)
-
-        x = self.conv31(x)
-        x = self.conv32(x)
-        x = self.maxp(x)
-
-        x = self.conv41(x)
-        x = self.conv42(x)
-        x = self.maxp(x)
-
-        return x
-
-
-def conv3x3(in_planes, out_planes, stride=1):
-    """3x3 convolution with padding"""
-    return nn.Conv2d(in_planes, out_planes, kernel_size=3, stride=stride,
-                     padding=1, bias=False)
-
-class BasicBlock(nn.Module):
-    expansion = 1
-
-    def __init__(self, inplanes, planes, stride=1, downsample=None):
-        super(BasicBlock, self).__init__()
-        self.conv1 = conv3x3(inplanes, planes, stride)
-        self.bn1 = nn.BatchNorm2d(planes)
-        self.relu = nn.ReLU(inplace=True)
-        self.conv2 = conv3x3(planes, planes)
-        self.bn2 = nn.BatchNorm2d(planes)
-        self.downsample = downsample
-        self.stride = stride
-
-    def forward(self, x):
-        residual = x
-
-        out = self.conv1(x)
-        out = self.bn1(out)
-        out = self.relu(out)
-
-        out = self.conv2(out)
-        out = self.bn2(out)
-
-        if self.downsample is not None:
-            residual = self.downsample(x)
-
-        out += residual
-        out = self.relu(out)
-
-        return out
-
-
 
 class BasicResBlock(nn.Module):
     def __init__(self, in_channels, out_channels, stride=1):
@@ -154,76 +59,6 @@ class BasicResBlock(nn.Module):
         x += residual
         return self.relu(x)
 
-
-class MambaBlock(nn.Module):
-    def __init__(self, args, channels, mlp_ratio=4):
-        """
-            channels: 输入特征的通道数 (C)
-            mlp_ratio: MLP 隐藏层的通道扩展比例
-        """
-        super(MambaBlock, self).__init__()
-        self.args = args
-
-        self.norm1 = nn.LayerNorm(channels)
-        self.norm2 = nn.LayerNorm(channels)
-
-        self.mamba = Mamba(channels)
-
-        hidden_dim = int(channels * mlp_ratio)
-        self.mlp = nn.Sequential(
-            nn.Linear(channels, hidden_dim),
-            nn.GELU(),
-            nn.Linear(hidden_dim, channels)
-
-        )
-
-    def forward(self, x):
-        assert len(x.shape) == 4, 'x.shape must be (B, C, H, W)'
-        B, C, H, W = x.shape
-
-        # print("x.shape", x.shape)
-        x = x.permute(0, 2, 3, 1) # x [B, H, W, C]
-
-        x_residual = x # x_residual [B, H, W, C]
-        x = self.norm1(x) # x [B, H, W, C]
-
-        x_flat = x.reshape(B, H * W, C) # x_flat [B, n_tokens, C]
-
-        x_mamba = self.mamba(x_flat) # x_mamba [B, n_tokens, C]
-        x = x_mamba.reshape(B, H, W, C) # x [B, H, W, C]
-        x = x + x_residual # x [B, H, W, C]
-
-        x_residual = x
-        x = self.norm2(x)
-        x = self.mlp(x)
-        # print("x.shape", x.shape)
-        # print("x_residual_shape", x_residual.shape)
-        x = x + x_residual
-
-        x = x.permute(0, 3, 1, 2)
-
-        return x
-
-class Mlp(nn.Module):
-    def __init__(self, in_features, hidden_features=None, out_features=None, act_layer=nn.GELU, drop=0.,
-                 channels_first=False):
-        super().__init__()
-        out_features = out_features or in_features
-        hidden_features = hidden_features or in_features
-
-        Linear = Linear2d if channels_first else nn.Linear
-        self.fc1 = Linear(in_features, hidden_features)
-        self.act = act_layer()
-        self.fc2 = Linear(hidden_features, out_features)
-        self.drop = nn.Dropout(drop)
-
-    def forward(self, x):
-        x = self.fc1(x)
-        x = self.act(x)
-        x = self.drop(x)
-        x = self.fc2(x)
-        x = self.drop(x)
-        return x
 
 class DWConv(nn.Module):
     def __init__(self, in_channels, out_channels, kernel_size=3, stride=1, padding=1):
@@ -301,65 +136,94 @@ class FusionBlock(nn.Module):
         return x_fusion
 
 
+class Mlp(nn.Module):
+    def __init__(self, in_features, hidden_features=None, act_layer=nn.GELU):
+        super().__init__()
+        self.fc1 = nn.Linear(in_features, hidden_features)
+        self.act = act_layer()
+        self.fc2 = nn.Linear(hidden_features, in_features)
+
+    def forward(self, x):
+        B, H, W, C = x.shape
+        x = x.reshape(B, H * W, C)
+        x = self.fc1(x)
+        x = self.act(x)
+        x = self.fc2(x)
+        return x.reshape(B, H, W, C)
+
 class TransformerBlock(nn.Module):
     def __init__(self,
-                 hidden_dim,
+                 dim,
                  num_heads=4,
-                 mlp_ratio=4.0,
-                 dropout=0.1,  # 新增dropout参数
-                 attention_dropout=0.1  # 注意力专用dropout
-                 ):
+                 mlp_ratio=4,
+                 drop_path_rate=0.,
+                 qkv_bias=True):
         super().__init__()
-        # 新增多个dropout层
-        self.attention_dropout = nn.Dropout(attention_dropout)
-        self.mlp_dropout = nn.Dropout(dropout)
-        self.post_dropout = nn.Dropout(dropout / 2)
-
-        # 原归一化层保持不变
-        self.norm1 = nn.LayerNorm(hidden_dim, eps=1e-6)
-        self.norm2 = nn.LayerNorm(hidden_dim, eps=1e-6)
-
-        # 修改注意力层添加dropout
-        self.attn = nn.MultiheadAttention(
-            embed_dim=hidden_dim,
+        self.norm1 = nn.LayerNorm(dim)
+        self.attn = MultiheadAttention2D(
+            dim=dim,
             num_heads=num_heads,
-            dropout=attention_dropout,  # 官方实现的注意力dropout
-            bias=False
+            qkv_bias=qkv_bias
         )
+        self.drop_path = nn.DropPath(drop_path_rate) if drop_path_rate > 0 else nn.Identity()
 
-        # 修改MLP结构添加dropout
-        self.mlp = nn.Sequential(
-            nn.Linear(hidden_dim, int(hidden_dim * mlp_ratio)),
-            nn.GELU(),
-            self.mlp_dropout,  # MLP内部dropout
-            nn.Linear(int(hidden_dim * mlp_ratio), hidden_dim),
-            self.post_dropout  # 输出后dropout
+        self.norm2 = nn.LayerNorm(dim)
+        self.mlp = Mlp(
+            in_features=dim,
+            hidden_features=int(dim * mlp_ratio),
+            act_layer=nn.GELU
         )
 
     def forward(self, x):
         B, C, H, W = x.shape
-        x_perm = x.permute(0, 2, 3, 1)
-        x_flat = x_perm.reshape(B, H * W, C)
+        x = x.permute(0, 2, 3, 1)  # [B, H, W, C]
 
-        # 残差连接1
-        residual = x_flat
-        x_flat = self.norm1(x_flat)
-        x_flat, _ = self.attn(x_flat, x_flat, x_flat)
-        x_flat = self.attention_dropout(x_flat)  # 注意力后dropout
-        x_flat = residual + x_flat
+        # Attention分支
+        residual = x
+        x = self.norm1(x)
+        x = self.attn(x)  # [B, H, W, C]
+        x = residual + self.drop_path(x)
 
-        # 残差连接2
-        residual = x_flat
-        x_flat = self.norm2(x_flat)
-        x_flat = self.mlp(x_flat)
-        x_flat = residual + x_flat
+        # MLP分支
+        residual = x
+        x = self.norm2(x)
+        x = self.mlp(x)
+        x = residual + self.drop_path(x)
 
-        # 最终的dropout
-        x_flat = self.post_dropout(x_flat)
+        return x.permute(0, 3, 1, 2)  # 恢复原始维度
 
-        # 形状恢复
-        x = x_flat.reshape(B, H, W, -1).permute(0, 3, 1, 2)
-        return x
+
+class MultiheadAttention2D(nn.Module):
+    def __init__(self, dim, num_heads=4, qkv_bias=True):
+        super().__init__()
+        self.num_heads = num_heads
+        head_dim = dim // num_heads
+        self.scale = head_dim ** -0.5
+
+        # 使用3D卷积实现位置编码
+        self.pos_embed = nn.Conv3d(dim, dim, kernel_size=(3, 3, 3), padding=1, groups=dim)
+
+        self.qkv = nn.Linear(dim, dim * 3, bias=qkv_bias)
+        self.proj = nn.Linear(dim, dim)
+
+    def forward(self, x):
+        B, H, W, C = x.shape
+
+        # 添加3D位置编码
+        x = x.permute(0, 3, 1, 2).unsqueeze(2)  # [B, C, 1, H, W]
+        x = x + self.pos_embed(x).squeeze(2)
+        x = x.permute(0, 2, 3, 1)  # 恢复[B, H, W, C]
+
+        # 生成QKV
+        qkv = self.qkv(x).reshape(B, H * W, 3, self.num_heads, C // self.num_heads).permute(2, 0, 3, 1, 4)
+        q, k, v = qkv.unbind(0)  # [B, num_heads, HW, head_dim]
+
+        # 注意力计算
+        attn = (q @ k.transpose(-2, -1)) * self.scale
+        attn = attn.softmax(dim=-1)
+
+        x = (attn @ v).transpose(1, 2).reshape(B, H, W, C)
+        return self.proj(x)
 
 class MambaNet(nn.Module):
     def __init__(self,
@@ -385,7 +249,7 @@ class MambaNet(nn.Module):
         """
         super(MambaNet, self).__init__()
         self.args = args
-        self._init_weights()
+
         # self.stem = nn.Sequential(
         #     nn.Conv2d(in_channels, dims[0], kernel_size=patch_size, stride=patch_size, padding=(patch_size - 1) // 2),
         #     Permute(0, 2, 3, 1) if channel_first else nn.Identity(),  # 调整为 [B, H, W, C]
@@ -394,9 +258,9 @@ class MambaNet(nn.Module):
         #     nn.GELU()
         # )
 
-        self.stem = BasicResBlock(in_channels, dims[0], stride=2)
+        self.stem = BasicResBlock(in_channels, dims[0], stride=1)
 
-        # self.stem = VGG8(in_channels)
+        # self.stem = VGG8(1)
 
         self.stages = nn.ModuleList()
         self.fusion_layers = nn.ModuleList()
@@ -406,31 +270,22 @@ class MambaNet(nn.Module):
         cur = 0
         for i in range(len(depths)):
             # 每个阶段包含多个VSSBlock
-            stage = nn.Sequential(*[
-
-                Permute(0, 2, 3, 1),
-                *[VSSBlock(
-                    hidden_dim=dims[i],
-                    drop_path=dp_rates[cur + j],
-                    ssm_d_state=ssm_d_state,
-                    ssm_ratio=ssm_ratio,
-                    ssm_conv=ssm_conv,
-                    ssm_conv_bias=ssm_conv_bias,
-                    forward_type="v05_noz",
-                    channel_first=False
-                    ) for j in range(depths[i])
-                ],
-                Permute(0, 3, 1, 2)
-            ])
-
-            # stage = nn.Sequential(
-            #     *[TransformerBlock(
+            # stage = nn.Sequential(*[
+            #
+            #     Permute(0, 2, 3, 1),
+            #     *[VSSBlock(
             #         hidden_dim=dims[i],
-            #         num_heads=4,
-            #         mlp_ratio=mlp_ratio,
-            #         dropout=0.5
-            #     ) for _ in range(depths[i])]
-            # )
+            #         drop_path=dp_rates[cur + j],
+            #         ssm_d_state=ssm_d_state,
+            #         ssm_ratio=ssm_ratio,
+            #         ssm_conv=ssm_conv,
+            #         ssm_conv_bias=ssm_conv_bias,
+            #         forward_type="v05_noz",
+            #         channel_first=False
+            #         ) for j in range(depths[i])
+            #     ],
+            #     Permute(0, 3, 1, 2)
+            # ])
 
             # stage = nn.Sequential(*[
             #     MambaBlock(
@@ -439,6 +294,15 @@ class MambaNet(nn.Module):
             #         mlp_ratio=mlp_ratio
             #     ) for j in range(depths[i])
             # ])
+
+            stage = nn.Sequential(*[
+                TransformerBlock(
+                    dim=dims[i],
+                    num_heads=8,
+                    mlp_ratio=mlp_ratio,
+                    drop_path_rate=dp_rates[cur + j]
+                ) for j in range(depths[i])
+            ])
             self.stages.append(stage)
             cur += depths[i]
 
@@ -468,7 +332,7 @@ class MambaNet(nn.Module):
 
         # 计算 Mlp 输入维度
         mlp_in_dim = sum([dims[i] for i in range(len(depths))])
-        self.mlp = Mlp(in_features=1382400, hidden_features=256, out_features=num_classes, drop=0.1, channels_first=False)
+        # self.mlp = Mlp(in_features=1382400, hidden_features=256, out_features=num_classes, drop=0.1, channels_first=False)
 
         self.global_pool = nn.AdaptiveAvgPool2d(1)  # 将 (B, C, H, W) -> (B, C, 1, 1)
         self.fc = nn.Linear(dims[-1], num_classes)  # 输出标量
@@ -483,9 +347,8 @@ class MambaNet(nn.Module):
             for stage, downsample in zip(self.stages, self.downsample_layers):
                 i += 1
                 print(f"stage{i}:, x1.shape:{x1.shape}")
-                # x1 = x1.permute(0, 2, 3, 1)
                 x1 = stage(x1)
-                # x1 = x1.permute(0, 3, 1, 2)
+                # outputs.append(x1)
                 # x1 = downsample(x1)
 
             age = self.regressor(x1)
@@ -519,18 +382,6 @@ class MambaNet(nn.Module):
             age2 = self.regressor(x2)
             avg_age = (age1 + age2) / 2
             return avg_age
-
-    def _init_weights(self):
-        for name, m in self.named_modules():
-            if isinstance(m, nn.Linear):
-                # 使用正态分布初始化输出层
-                if 'head' in name or 'fc' in name:
-                    nn.init.normal_(m.weight, mean=50.0, std=25.0)  # 假设年龄范围0-100
-                    nn.init.constant_(m.bias, 50.0)  # 初始预测值在50左右
-                else:
-                    nn.init.xavier_uniform_(m.weight)
-                    if m.bias is not None:
-                        nn.init.constant_(m.bias, 0)
 
 if __name__ == '__main__':
     model = MambaNet(None)

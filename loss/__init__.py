@@ -63,12 +63,12 @@ class Loss(nn.modules.loss._Loss):
 
         self.log = torch.Tensor()
 
-        device = torch.device('cpu' if args.cpu else 'cuda')
+        device = torch.device('cpu' if args.cpu else f'cuda:{args.gpu_ids[0]}')
         self.loss_module.to(device)
         # if args.precision == 'half': self.loss_module.half()
         if not args.cpu and args.n_GPUs > 1:
             self.loss_module = nn.DataParallel(
-                self.loss_module, range(args.n_GPUs)
+                self.loss_module, list(args.gpu_ids)
             )
 
         if args.load != '.': self.load(ckp.dir, cpu=args.cpu)

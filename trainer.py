@@ -20,7 +20,7 @@ class Trainer():
         self.loss = my_loss
         self.optimizer = utility.make_optimizer(args, self.model)
         self.scheduler = utility.make_scheduler(args, self.optimizer)
-        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        self.   device = torch.device(f'cuda:{args.gpu_ids[0]}' if torch.cuda.is_available() else 'cpu')
         if self.args.load != '.':
             self.optimizer.load_state_dict(
                 torch.load(os.path.join(ckp.dir, 'optimizer.pt'))
@@ -29,6 +29,17 @@ class Trainer():
 
         self.error_last = 1e8
         self.mse_min = None
+
+        total, trainable = self.count_parameters()
+        self.ckp.write_log(f'=============================================================')
+        self.ckp.write_log(f'Model Parameters - Total: {total:,}  Trainable: {trainable:,}')
+        self.ckp.write_log(f'=============================================================')
+
+    def count_parameters(self):
+        """统计模型的可训练参数量"""
+        total_params = sum(p.numel() for p in self.model.parameters())
+        trainable_params = sum(p.numel() for p in self.model.parameters() if p.requires_grad)
+        return total_params, trainable_params
 
     def train(self):
         self.scheduler.step()
@@ -44,7 +55,7 @@ class Trainer():
             # 如果是第一轮训练且未加载预训练模型
             self.loader_train.dataset.first_epoch = True
             # adjust learning rate
-            lr = 1e-3
+            lr = self.args.lr
             for param_group in self.optimizer.param_groups:
                 param_group['lr'] = lr
         else:
@@ -67,24 +78,25 @@ class Trainer():
 
             # print("img1_shape:", img1.shape)
             img1 = img1.float()
-            print('img1.min', img1.min(), 'img1.max', img1.max())
             img1 = img1.to(self.device)
             img2 = img2.float()
             img2 = img2.to(self.device)
+            # print("img1_shape:", img1.shape)
             if self.args.modal_num == 1:
                 pred_age = self.model(img1)
             elif self.args.modal_num == 2:
                 pred_age = self.model(img1, img2)
             pred_age = pred_age.to(self.device).float()
             true_age = true_age.to(self.device).float()
-            print(f"pred_age: {pred_age}\n true_age: {true_age}")
+            # print(f"pred_age: {pred_age}\n true_age: {true_age}")
             # loss function
             loss = self.loss(pred_age, true_age)
-            print("loss", loss)
+            # print("loss", loss)
             # backward
             if loss.item() < self.args.skip_threshold * self.error_last:
                 loss.backward()
 
+                torch.nn.utils.clip_grad_norm_(self.model.parameters(), max_norm=1.0)
                 ######################## 新增梯度监控部分 ########################
                 grad_norms = []
                 grad_max = []
@@ -100,13 +112,13 @@ class Trainer():
                         grad_std.append(grad.std().item())
 
                 # 记录梯度统计量
-                self.ckp.write_log(
-                    f'Grad Stats: '
-                    f'Mean Norm: {np.mean(grad_norms):.2e} | '
-                    f'Max: {np.max(grad_max):.2e} | '
-                    f'Min: {np.min(grad_min):.2e} | '
-                    f'Std: {np.mean(grad_std):.2e}'
-                )
+                # self.ckp.write_log(
+                #     f'Grad Stats: '
+                #     f'Mean Norm: {np.mean(grad_norms):.2e} | '
+                #     f'Max: {np.max(grad_max):.2e} | '
+                #     f'Min: {np.min(grad_min):.2e} | '
+                #     f'Std: {np.mean(grad_std):.2e}'
+                # )
 
                 # 检查梯度消失/爆炸
                 if np.mean(grad_norms) < 1e-7:

@@ -140,5 +140,4 @@ def make_scheduler(args, my_optimizer):
         )
 
     scheduler.step(args.start_epoch - 1)
-
     return scheduler
